@@ -17,9 +17,11 @@ export class UpdateUserUseCase {
   ) {}
   async execute(id: string, dto: UpdateUserDto) {
     const user = await this.userRepository.findById(id);
-    if (!user) throw new NotFoundException('Uset not found');
+    if (!user) throw new NotFoundException('User not found');
 
     if (dto.email) user.updateEmail(dto.email);
     if (dto.name) user.updateName(dto.name);
+
+    return this.userRepository.save(user);
   }
 }

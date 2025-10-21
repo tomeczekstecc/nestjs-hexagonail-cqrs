@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import {
   CreateUserDto,
   CreateUserUseCase,
@@ -6,7 +14,11 @@ import {
 import { User } from '../domain/entities/user.entity';
 import { GetUsersListUseCase } from '../application/use-cases/get-users-list.use-case';
 import { GetUserUseCase } from '../application/use-cases/get-user.use-case';
-import { DeleteUserUseCase } from '../application/use-cases/delete-user.use-case copy';
+import { DeleteUserUseCase } from '../application/use-cases/delete-user.use-case';
+import {
+  UpdateUserDto,
+  UpdateUserUseCase,
+} from '../application/use-cases/update-user.use-case';
 
 @Controller('users')
 export class UserController {
@@ -15,6 +27,7 @@ export class UserController {
     private getUsersList: GetUsersListUseCase,
     private getUserWithId: GetUserUseCase,
     private deleteUserWithId: DeleteUserUseCase,
+    private updateUserWithId: UpdateUserUseCase,
   ) {}
   private mapUserToResponse(user: User) {
     console.log({ email: user.getEmail() });
@@ -48,5 +61,13 @@ export class UserController {
   @Delete(':id')
   async deleteUserById(@Param('id') id: string) {
     return await this.deleteUserWithId.execute(id);
+  }
+
+  @Put(':id')
+  async updateUserById(
+    @Param('id') id: string,
+    @Body() request: UpdateUserDto,
+  ) {
+    return await this.updateUserWithId.execute(id, request);
   }
 }

@@ -7,27 +7,20 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import {
-  CreateUserDto,
-  CreateUserUseCase,
-} from '../application/use-cases/create-user.use-case';
 import { User } from '../domain/entities/user.entity';
-import { GetUsersListUseCase } from '../application/use-cases/get-users-list.use-case';
-import { GetUserUseCase } from '../application/use-cases/get-user.use-case';
-import { DeleteUserUseCase } from '../application/use-cases/delete-user.use-case';
-import {
-  UpdateUserDto,
-  UpdateUserUseCase,
-} from '../application/use-cases/update-user.use-case';
+
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CreateUserCommand } from '../application/commands/create-user.command';
+import { GetUsersListQuery } from '../application/queries/get-usres-list.query';
+import { GetUserQuery } from '../application/queries/get-user.query';
+import { DeleteUserCommand } from '../application/commands/delete-user.command';
+import { UpdateUserCommand } from '../application/commands/update-user.command';
 
 @Controller('users')
 export class UserController {
   constructor(
-    private createUserUseCase: CreateUserUseCase,
-    private getUsersList: GetUsersListUseCase,
-    private getUserWithId: GetUserUseCase,
-    private deleteUserWithId: DeleteUserUseCase,
-    private updateUserWithId: UpdateUserUseCase,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
   ) {}
   private mapUserToResponse(user: User) {
     console.log({ email: user.getEmail() });
@@ -43,31 +36,45 @@ export class UserController {
   }
 
   @Post()
-  async createUser(@Body() request: CreateUserDto) {
-    const user = await this.createUserUseCase.execute(request);
+  async createUser(
+    @Body()
+    request: CreateUserCommand, // DTO: bardzo możliwe że to mogą być inne DTO, oddzielne, tu akurat pasują takie
+  ) {
+    const command = new CreateUserCommand(request.name, request.email);
+    const user = await this.commandBus.execute<CreateUserCommand, User>(
+      command,
+    );
     return this.mapUserToResponse(user);
   }
 
   @Get()
   async getUsers() {
-    return await this.getUsersList.execute();
+    const query = new GetUsersListQuery();
+    return await this.queryBus.execute<GetUsersListQuery, User[]>(query);
   }
 
   @Get(':id')
   async getUserById(@Param('id') id: string) {
-    return await this.getUserWithId.execute(id);
+    const query = new GetUserQuery(id);
+    const user = await this.queryBus.execute<GetUserQuery, User>(query);
+    return this.mapUserToResponse(user);
   }
 
   @Delete(':id')
   async deleteUserById(@Param('id') id: string) {
-    return await this.deleteUserWithId.execute(id);
+    const command = new DeleteUserCommand(id);
+    return await this.commandBus.execute<DeleteUserCommand, string>(command);
   }
 
   @Put(':id')
   async updateUserById(
     @Param('id') id: string,
-    @Body() request: UpdateUserDto,
+    @Body() request: UpdateUserCommand,
   ) {
-    return await this.updateUserWithId.execute(id, request);
+    const command = new UpdateUserCommand(id, request.email, request.name);
+    const user = await this.commandBus.execute<UpdateUserCommand, User>(
+      command,
+    );
+    return this.mapUserToResponse(user);
   }
 }

@@ -1,25 +1,34 @@
+import { AggregateRoot } from '@nestjs/cqrs';
 import { Email, UserId } from '../value-objects';
+import { UserCreatedEvent } from '../events/user-created.event';
 
-export class User {
+export class User extends AggregateRoot {
   constructor(
     private readonly id: UserId,
     private name: string,
     private email: Email,
     private readonly createdAt: Date,
     private updatedAt: Date,
-  ) {}
+  ) {
+    super();
+  }
   static create(name: string, email: string) {
     if (!name || name.trim().length < 2) {
       throw new Error('Name must be at least 2 characters long');
     }
 
-    return new User(
-      new UserId(),
+    const userId = new UserId();
+
+    const user = new User(
+      userId,
       name.trim(),
       new Email(email),
       new Date(),
       new Date(),
     );
+    user.apply(new UserCreatedEvent(userId.getValue(), user.getName(), email));
+
+    return user;
   }
 
   getId(): UserId {

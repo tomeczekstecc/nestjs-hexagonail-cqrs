@@ -163,47 +163,562 @@ export class GetUserHandler implements IQueryHandler<GetUserQuery> {
 - **Performance**: Optimized queries for specific read scenarios
 - **Maintainability**: Clear separation between operations that change state vs. retrieve data
 
-## 📁 Project Structure
+## 📁 Project Structure & File Types Explained
 
 ```
 src/
-├── user/                           # User bounded context
-│   ├── domain/                     # Domain layer (business logic)
+├── user/                                    # 🏗️ Bounded Context (DDD)
+│   ├── domain/                              # 🏛️ DOMAIN LAYER
 │   │   ├── entities/
-│   │   │   └── user.entity.ts      # User aggregate root
+│   │   │   └── user.entity.ts               # 👤 Entity
+│   │   ├── events/
+│   │   │   └── user-created.event.ts        # 📢 Domain Event
 │   │   └── value-objects/
-│   │       ├── user-id.vo.ts       # User identifier
-│   │       ├── email.vo.ts         # Email value object
-│   │       └── index.ts
-│   ├── application/                # Application layer (use cases)
-│   │   ├── commands/               # Write operations
-│   │   │   ├── create-user.ts      # Create user command
-│   │   │   ├── delete-user.ts      # Delete user command
+│   │       ├── user-id.vo.ts                # 🏷️ Value Object
+│   │       ├── email.vo.ts                  # 📧 Value Object
+│   │       └── index.ts                     # 📦 Barrel Export
+│   ├── application/                         # ⚙️ APPLICATION LAYER
+│   │   ├── commands/                        # ✍️ Commands (CQRS Write)
+│   │   │   ├── create-user.command.ts       # 📝 Command
+│   │   │   ├── delete-user.command.ts       # 🗑️ Command
+│   │   │   ├── update-user.command.ts       # ✏️ Command
 │   │   │   └── handlers/
-│   │   │       ├── create-user.handler.ts
-│   │   │       ├── delete-user.handler.ts
-│   │   │       └── index.ts
-│   │   ├── queries/                # Read operations
-│   │   │   ├── get-user.query.ts
-│   │   │   ├── get-users-list.query.ts
+│   │   │       ├── create-user.handler.ts   # 🔧 Command Handler
+│   │   │       ├── delete-user.handler.ts   # 🔧 Command Handler
+│   │   │       ├── update-user.handler.ts   # 🔧 Command Handler
+│   │   │       └── index.ts                 # 📦 Barrel Export
+│   │   ├── queries/                         # 🔍 Queries (CQRS Read)
+│   │   │   ├── get-user.query.ts            # 🔎 Query
+│   │   │   ├── get-users-list.query.ts      # 📋 Query
 │   │   │   └── handlers/
-│   │   │       ├── get-user.handler.ts
-│   │   │       ├── get-users-list.handler.ts
-│   │   │       └── index.ts
-│   │   ├── ports/                  # Interfaces for external dependencies
-│   │   │   └── user.repository.port.ts
-│   │   └── use-cases/              # Application services
-│   │       └── update-user.use-case.ts
-│   ├── infrastructure/             # Infrastructure layer (adapters)
-│   │   └── adapters/
-│   │       └── in-memory-user.repository.ts
-│   ├── presentation/               # Presentation layer (controllers)
-│   │   └── user.controller.ts      # REST API endpoints
-│   └── user.module.ts              # NestJS module configuration
-└── app.module.ts                   # Main application module
+│   │   │       ├── get-user.handler.ts      # 🔧 Query Handler
+│   │   │       ├── get-users-list.handler.ts # 🔧 Query Handler
+│   │   │       └── index.ts                 # 📦 Barrel Export
+│   │   ├── events/                          # 🎯 Event Handlers
+│   │   │   ├── user-created.handler.ts      # 📩 Event Handler
+│   │   │   └── index.ts                     # 📦 Barrel Export
+│   │   └── ports/                           # 🔌 Ports (Hexagonal)
+│   │       ├── user.repository.port.ts      # 💾 Repository Port
+│   │       └── email-notification.port.ts   # 📬 Notification Port
+│   ├── infrastructure/                      # 🔧 INFRASTRUCTURE LAYER
+│   │   └── adapters/                        # 🔌 Adapters (Hexagonal)
+│   │       ├── in-memory-user.repository.ts # 💾 Repository Adapter
+│   │       └── console-email.adapter.ts     # 📬 Email Adapter
+│   ├── presentation/                        # 🎮 PRESENTATION LAYER
+│   │   └── user.controller.ts               # 🌐 REST Controller
+│   └── user.module.ts                       # 📦 NestJS Module
+└── app.module.ts                            # 🏠 Main Application Module
 ```
 
-### Layer Responsibilities
+## 🔍 File Types Deep Dive
+
+### 🏛️ Domain Layer Files
+
+#### 👤 **Entities (.entity.ts)**
+
+**Purpose**: Core business objects with identity and lifecycle
+**Why Important**:
+
+- Encapsulate business rules and invariants
+- Maintain consistency within aggregates
+- Represent the heart of your business logic
+
+```typescript
+// Example: user.entity.ts
+export class User {
+  // Business rules enforced here
+  static create(name: string, email: string) {
+    if (!name || name.trim().length < 2) {
+      throw new Error('Name must be at least 2 characters long');
+    }
+    return new User(
+      new UserId(),
+      name.trim(),
+      new Email(email),
+      new Date(),
+      new Date(),
+    );
+  }
+}
+```
+
+#### 🏷️ **Value Objects (.vo.ts)**
+
+**Purpose**: Immutable objects that describe characteristics of entities
+**Why Important**:
+
+- Prevent primitive obsession
+- Encapsulate validation logic
+- Express domain concepts clearly
+
+```typescript
+// Example: email.vo.ts
+export class Email {
+  constructor(private readonly value: string) {
+    if (!this.isValid(value)) {
+      throw new Error('Invalid email format');
+    }
+  }
+
+  private isValid(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+}
+```
+
+#### 📢 **Domain Events (.event.ts)**
+
+**Purpose**: Capture important business events that occur in the domain
+**Why Important**:
+
+- Decouple domain logic from side effects
+- Enable event-driven architecture
+- Maintain audit trails of business activities
+
+```typescript
+// Example: user-created.event.ts
+export class UserCreatedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly name: string,
+    public readonly email: string,
+  ) {}
+}
+```
+
+### ⚙️ Application Layer Files
+
+#### 📝 **Commands (.command.ts)**
+
+**Purpose**: Represent intention to change system state (CQRS Write Side)
+**Why Important**:
+
+- Express user intentions clearly
+- Validate input data
+- Serve as contracts for write operations
+
+```typescript
+// Example: create-user.command.ts
+export class CreateUserCommand {
+  constructor(
+    public readonly name: string,
+    public readonly email: string,
+  ) {}
+}
+```
+
+#### 🔧 **Command Handlers (.handler.ts)**
+
+**Purpose**: Execute business logic for commands
+**Why Important**:
+
+- Orchestrate domain objects
+- Handle cross-cutting concerns (validation, transactions)
+- Emit domain events
+
+```typescript
+// Example: create-user.handler.ts
+@CommandHandler(CreateUserCommand)
+export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
+  async execute(command: CreateUserCommand): Promise<User> {
+    // 1. Validate business rules
+    // 2. Create domain object
+    // 3. Save via repository
+    // 4. Emit domain events
+  }
+}
+```
+
+#### 🔎 **Queries (.query.ts)**
+
+**Purpose**: Represent requests for data (CQRS Read Side)
+**Why Important**:
+
+- Separate read concerns from write concerns
+- Optimize for specific read scenarios
+- Express data requirements clearly
+
+```typescript
+// Example: get-user.query.ts
+export class GetUserQuery {
+  constructor(public readonly userId: string) {}
+}
+```
+
+#### 🔧 **Query Handlers (.handler.ts)**
+
+**Purpose**: Execute data retrieval logic
+**Why Important**:
+
+- Optimize read operations independently
+- Transform data for specific use cases
+- Cache frequently accessed data
+
+#### 📩 **Event Handlers (.handler.ts)**
+
+**Purpose**: React to domain events with side effects
+**Why Important**:
+
+- Decouple business logic from infrastructure concerns
+- Handle eventual consistency
+- Trigger downstream processes
+
+```typescript
+// Example: user-created.handler.ts
+@EventsHandler(UserCreatedEvent)
+export class UserCreatedHandler implements IEventHandler<UserCreatedEvent> {
+  async handle(event: UserCreatedEvent) {
+    // Send welcome email, update analytics, etc.
+  }
+}
+```
+
+#### 🔌 **Ports (.port.ts)**
+
+**Purpose**: Define interfaces for external dependencies (Hexagonal Architecture)
+**Why Important**:
+
+- Achieve dependency inversion
+- Enable easy testing with mocks
+- Allow swapping implementations
+
+```typescript
+// Example: user.repository.port.ts
+export interface UserRepositoryPort {
+  save(user: User): Promise<User>;
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+}
+```
+
+### 🔧 Infrastructure Layer Files
+
+#### 🔌 **Adapters (.adapter.ts)**
+
+**Purpose**: Implement ports with concrete technology choices
+**Why Important**:
+
+- Isolate technical implementation details
+- Enable technology swapping without domain changes
+- Handle framework-specific concerns
+
+```typescript
+// Example: console-email.adapter.ts
+@Injectable()
+export class ConsoleEmailAdapter implements EmailNotificationPort {
+  async sendActivationEmail(email: string, name: string): Promise<string> {
+    console.log(`[EMAIL] Sending to: ${email}`);
+    return 'done';
+  }
+}
+```
+
+### 🎮 Presentation Layer Files
+
+#### 🌐 **Controllers (.controller.ts)**
+
+**Purpose**: Handle HTTP requests and responses
+**Why Important**:
+
+- Translate HTTP concerns to application concerns
+- Handle request validation and transformation
+- Provide REST API interface
+
+### 📦 **Module Files (.module.ts)**
+
+**Purpose**: Configure dependency injection and module boundaries
+**Why Important**:
+
+- Wire up dependencies
+- Define module boundaries
+- Configure providers and exports
+
+### 📦 **Index Files (index.ts)**
+
+**Purpose**: Barrel exports for cleaner imports
+**Why Important**:
+
+- Reduce import complexity
+- Control what's exposed from modules
+- Improve code organization
+
+## 🏗️ Architecture Principles & Patterns
+
+### 🎯 **CQRS (Command Query Responsibility Segregation)**
+
+#### Why Separate Commands and Queries?
+
+**Commands (Write Side)**:
+
+- **Single Responsibility**: Each command does one thing
+- **Business Intent**: Express what the user wants to achieve
+- **Validation**: Ensure business rules are enforced
+- **Side Effects**: Can trigger events and notifications
+
+**Queries (Read Side)**:
+
+- **Optimized Reads**: Tailored for specific UI needs
+- **No Side Effects**: Pure data retrieval
+- **Performance**: Can use different storage optimizations
+- **Scalability**: Read models can be scaled independently
+
+```typescript
+// ✅ Command - Changes state, no return data
+@CommandHandler(CreateUserCommand)
+export class CreateUserHandler {
+  async execute(command: CreateUserCommand): Promise<void> {
+    const user = User.create(command.name, command.email);
+    await this.userRepository.save(user);
+    // Emits UserCreatedEvent internally
+  }
+}
+
+// ✅ Query - Returns data, no state changes
+@QueryHandler(GetUserQuery)
+export class GetUserHandler {
+  async execute(query: GetUserQuery): Promise<UserView> {
+    return this.userRepository.findById(query.userId);
+  }
+}
+```
+
+### 🔄 **Event-Driven Architecture**
+
+#### Domain Events Flow:
+
+1. **Command** → 2. **Handler** → 3. **Domain Event** → 4. **Event Handler** → 5. **Side Effects**
+
+```typescript
+// 1. Command arrives
+CreateUserCommand { name: "John", email: "john@example.com" }
+
+// 2. Handler processes business logic
+CreateUserHandler.execute()
+  → User.create()
+  → userRepository.save()
+
+// 3. Domain event is emitted
+UserCreatedEvent { userId: "123", name: "John", email: "john@example.com" }
+
+// 4. Event handler reacts
+UserCreatedHandler.handle()
+  → emailService.sendActivationEmail()
+```
+
+### 🏗️ **Hexagonal Architecture Benefits**
+
+#### Dependency Direction:
+
+```
+Infrastructure → Application → Domain
+     ↑              ↑           ↑
+   Adapters      Handlers    Entities
+    Ports        Events      Values
+```
+
+**Key Principles**:
+
+- **Domain is Independent**: No framework dependencies
+- **Ports Define Contracts**: Application layer defines what it needs
+- **Adapters Implement Details**: Infrastructure provides implementations
+- **Testability**: Easy to mock external dependencies
+
+```typescript
+// ❌ Domain depending on infrastructure (BAD)
+class User {
+  async save() {
+    const db = new DatabaseConnection(); // Framework dependency!
+    await db.save(this);
+  }
+}
+
+// ✅ Domain independent, infrastructure adapts (GOOD)
+class User {
+  // Pure business logic, no dependencies
+}
+
+interface UserRepositoryPort {
+  save(user: User): Promise<User>;
+}
+
+class DatabaseUserRepository implements UserRepositoryPort {
+  async save(user: User): Promise<User> {
+    // Database-specific implementation
+  }
+}
+```
+
+## 🎨 Design Patterns in Action
+
+### 🏭 **Factory Pattern**
+
+```typescript
+// Entity factory methods for complex creation logic
+class User {
+  static create(name: string, email: string): User {
+    // Validation and business rules
+    return new User(new UserId(), name, new Email(email), new Date());
+  }
+
+  static fromPersistence(data: UserData): User {
+    // Reconstruct from database
+    return new User(data.id, data.name, data.email, data.createdAt);
+  }
+}
+```
+
+### 🔍 **Repository Pattern**
+
+```typescript
+// Port (interface) - in application layer
+interface UserRepositoryPort {
+  save(user: User): Promise<User>;
+  findById(id: UserId): Promise<User | null>;
+}
+
+// Adapter (implementation) - in infrastructure layer
+class DatabaseUserRepository implements UserRepositoryPort {
+  async save(user: User): Promise<User> {
+    // ORM/Database specific code
+  }
+}
+```
+
+### 📢 **Observer Pattern (Events)**
+
+```typescript
+// Domain event
+class UserCreatedEvent {
+  constructor(public readonly user: User) {}
+}
+
+// Multiple handlers can react to the same event
+@EventsHandler(UserCreatedEvent)
+class SendWelcomeEmailHandler {
+  /* ... */
+}
+
+@EventsHandler(UserCreatedEvent)
+class UpdateAnalyticsHandler {
+  /* ... */
+}
+
+@EventsHandler(UserCreatedEvent)
+class CreateUserProfileHandler {
+  /* ... */
+}
+```
+
+## 🧪 Testing Strategy by Layer
+
+### 🏛️ **Domain Layer Testing**
+
+```typescript
+describe('User Entity', () => {
+  it('should enforce business rules', () => {
+    // Test pure business logic
+    expect(() => User.create('', 'invalid-email')).toThrow(
+      'Invalid name or email',
+    );
+  });
+
+  it('should calculate account age correctly', () => {
+    const user = User.create('John', 'john@example.com');
+    expect(user.getAccountAge()).toBe(0);
+  });
+});
+```
+
+### ⚙️ **Application Layer Testing**
+
+```typescript
+describe('CreateUserHandler', () => {
+  it('should create user and emit event', async () => {
+    // Mock dependencies (ports)
+    const mockRepository = createMock<UserRepositoryPort>();
+    const mockEventBus = createMock<EventBus>();
+
+    const handler = new CreateUserHandler(mockRepository, mockEventBus);
+    const command = new CreateUserCommand('John', 'john@example.com');
+
+    await handler.execute(command);
+
+    expect(mockRepository.save).toHaveBeenCalled();
+    expect(mockEventBus.publish).toHaveBeenCalledWith(
+      expect.any(UserCreatedEvent),
+    );
+  });
+});
+```
+
+### 🔧 **Infrastructure Layer Testing**
+
+```typescript
+describe('DatabaseUserRepository', () => {
+  it('should save user to database', async () => {
+    // Test with real database or test container
+    const repository = new DatabaseUserRepository(testDb);
+    const user = User.create('John', 'john@example.com');
+
+    const savedUser = await repository.save(user);
+
+    expect(savedUser.getId()).toBeDefined();
+  });
+});
+```
+
+## 🚀 Benefits of This Architecture
+
+### 📈 **Scalability**
+
+- **Read/Write Separation**: Scale queries and commands independently
+- **Event-Driven**: Async processing of side effects
+- **Microservice Ready**: Clear boundaries for service extraction
+
+### 🧪 **Testability**
+
+- **Isolated Units**: Test each layer independently
+- **Mocked Dependencies**: Ports enable easy mocking
+- **Fast Tests**: Domain logic tests run without infrastructure
+
+### 🔧 **Maintainability**
+
+- **Clear Boundaries**: Each layer has specific responsibilities
+- **Dependency Direction**: Changes flow outward from domain
+- **Single Responsibility**: Each file has one clear purpose
+
+### 🛡️ **Reliability**
+
+- **Business Rules Protection**: Domain logic is isolated
+- **Type Safety**: Strong typing throughout
+- **Event Consistency**: Eventual consistency through events
+
+## 🔄 Request Flow Examples
+
+### Creating a User (Command Flow):
+
+```
+1. POST /users → UserController.createUser()
+2. Controller → CreateUserCommand
+3. Command Bus → CreateUserHandler.execute()
+4. Handler → User.create() (domain logic)
+5. Handler → userRepository.save() (persistence)
+6. Handler → EventBus.publish(UserCreatedEvent)
+7. UserCreatedHandler → emailService.sendActivationEmail()
+8. Response ← Formatted user data
+```
+
+### Getting a User (Query Flow):
+
+```
+1. GET /users/123 → UserController.getUserById()
+2. Controller → GetUserQuery
+3. Query Bus → GetUserHandler.execute()
+4. Handler → userRepository.findById() (read)
+5. Response ← User data (no side effects)
+```
+
+This architecture ensures that your application remains maintainable, testable, and aligned with business requirements while providing flexibility for future changes and scaling.
 
 #### 🏛️ Domain Layer
 
